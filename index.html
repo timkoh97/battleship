@@ -424,6 +424,17 @@
     background: rgba(0,212,255,0.06);
     min-width: 32px;
     text-align: center;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  #orient-badge:hover {
+    background: rgba(0,212,255,0.15);
+  }
+
+  #orient-badge:active {
+    background: rgba(0,212,255,0.3);
   }
 
   .orient-label {
@@ -437,9 +448,13 @@
   .fleet-ship-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 6px;
     font-size: 0.68rem;
   }
+
+  .fleet-ship-name { flex: 1; }
+
+  .fleet-hp-blocks { display: flex; gap: 2px; flex-shrink: 0; }
 
   .fleet-ship-name {
     color: var(--text);
@@ -454,8 +469,8 @@
   .fleet-status.sunk-status { color: var(--hit); }
 
   .log-panel {
-    max-height: 120px;
-    overflow-y: auto;
+    height: 120px;
+    overflow-y: scroll;
     display: flex;
     flex-direction: column-reverse;
     gap: 2px;
@@ -504,11 +519,11 @@
     <div class="panel">
       <div class="panel-title">FLEET DEPLOYMENT</div>
       <div class="ship-list" id="ship-list"></div>
-      <div class="rotate-hint" style="font-size:0.6rem;color:var(--text);text-align:center;margin-top:6px;line-height:1.5">
+      <div class="rotate-hint" style="font-size:0.6rem;color:var(--text);text-align:center;margin-top:6px;margin-bottom:6px;line-height:1.5">
         Click the name of a placed ship to remove it
       </div>
-      <div class="orient-row">
-        <span class="orient-label">[ R ] to rotate</span>
+      <div class="orient-row" style="margin-bottom:10px;">
+        <span class="orient-label">Tap to rotate</span>
         <span id="orient-badge">H</span>
       </div>
       <button id="btn-start" disabled>LAUNCH BATTLE</button>
@@ -529,7 +544,9 @@
     <div class="panel">
       <div class="panel-title">STATISTICS</div>
       <div class="stat-row"><span>Your hits</span><span class="stat-val" id="stat-your-hits">0</span></div>
+      <div class="stat-row"><span>Your misses</span><span class="stat-val" id="stat-your-misses">0</span></div>
       <div class="stat-row"><span>Enemy hits</span><span class="stat-val" id="stat-enemy-hits">0</span></div>
+      <div class="stat-row"><span>Enemy misses</span><span class="stat-val" id="stat-enemy-misses">0</span></div>
       <div class="stat-row"><span>Ships sunk</span><span class="stat-val" id="stat-sunk">0/5</span></div>
     </div>
 
@@ -548,7 +565,7 @@
 </div>
 
 <footer style="margin-top:28px;font-size:0.6rem;color:var(--dim);letter-spacing:0.15em;text-align:center;padding-bottom:16px">
-  Made for joy by Tim &times; Claude &nbsp;·&nbsp; v1.0 &nbsp;·&nbsp; 25/04/2026
+  Made for joy by Tim &times; Claude &nbsp;·&nbsp; v1.1 &nbsp;·&nbsp; 26/04/2026
 </footer>
 
 <div id="overlay">
@@ -562,7 +579,7 @@
 
 <script>
 const COLS = 'ABCDEFGHIJ'.split('');
-const ROWS = '1234567890'.split('');
+const ROWS = '0123456789'.split('');
 
 const SHIPS = [
   { name: 'Carrier',    size: 5, id: 'carrier' },
@@ -589,7 +606,7 @@ let aiMode = 'hunt'; // 'hunt' | 'target'
 let aiHits = [];     // consecutive hits on current ship
 let aiQueue = [];    // cells queued to try (target mode)
 
-let stats = { yourHits: 0, enemyHits: 0, sunk: 0 };
+let stats = { yourHits: 0, yourMisses: 0, enemyHits: 0, enemyMisses: 0, sunk: 0 };
 
 // ── Init ───────────────────────────────────────────────────────────────
 
@@ -603,7 +620,7 @@ function init() {
   aiMode = 'hunt';
   aiHits = [];
   aiQueue = [];
-  stats = { yourHits: 0, enemyHits: 0, sunk: 0 };
+  stats = { yourHits: 0, yourMisses: 0, enemyHits: 0, enemyMisses: 0, sunk: 0 };
 
   buildGridLabels('player');
   buildGridLabels('enemy');
@@ -614,7 +631,7 @@ function init() {
   updateStats();
   clearLog();
   addLog('Awaiting fleet deployment…', '');
-  setStatus('PLACE YOUR FLEET — SELECT A VESSEL, THEN CLICK YOUR GRID');
+  setStatus('SELECT A SHIP FROM THE PANEL TO BEGIN PLACING YOUR FLEET');
   document.getElementById('btn-start').disabled = true;
   document.getElementById('orient-badge').textContent = 'H';
   document.getElementById('overlay').classList.remove('show');
@@ -799,7 +816,11 @@ function buildFleetHealth() {
   SHIPS.forEach(ship => {
     const row = document.createElement('div');
     row.className = 'fleet-ship-row';
+    const blocks = Array.from({ length: ship.size }, () =>
+      `<div class="ship-block"></div>`
+    ).join('');
     row.innerHTML = `
+      <div class="fleet-hp-blocks">${blocks}</div>
       <span class="fleet-ship-name">${ship.name}</span>
       <span class="fleet-status afloat" id="fstatus-${ship.id}">AFLOAT</span>
     `;
@@ -896,6 +917,7 @@ function fireAt(r, c, board, side, isPlayer) {
         addLog(`HIT — ${coord}`, 'hit-log you');
       }
     } else {
+      stats.yourMisses++;
       addLog(`MISS — ${coord}`, 'miss-log you');
     }
   } else {
@@ -909,6 +931,7 @@ function fireAt(r, c, board, side, isPlayer) {
         addLog(`ENEMY HIT — ${coord}`, 'hit-log');
       }
     } else {
+      stats.enemyMisses++;
       addLog(`Enemy miss — ${coord}`, 'miss-log');
     }
     renderPlayerGrid();
@@ -1060,7 +1083,9 @@ function clearLog() {
 
 function updateStats() {
   document.getElementById('stat-your-hits').textContent = stats.yourHits;
+  document.getElementById('stat-your-misses').textContent = stats.yourMisses;
   document.getElementById('stat-enemy-hits').textContent = stats.enemyHits;
+  document.getElementById('stat-enemy-misses').textContent = stats.enemyMisses;
   document.getElementById('stat-sunk').textContent = `${stats.sunk}/5`;
 }
 
@@ -1068,12 +1093,10 @@ function randInt(n) { return Math.floor(Math.random() * n); }
 
 // ── Controls ───────────────────────────────────────────────────────────
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'r' || e.key === 'R') {
-    if (phase === 'placement') {
-      horizontal = !horizontal;
-      document.getElementById('orient-badge').textContent = horizontal ? 'H' : 'V';
-    }
+document.getElementById('orient-badge').addEventListener('click', () => {
+  if (phase === 'placement') {
+    horizontal = !horizontal;
+    document.getElementById('orient-badge').textContent = horizontal ? 'H' : 'V';
   }
 });
 
