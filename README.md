@@ -21,7 +21,7 @@ Made for joy with Claude.
 - Rotation option for ships
 - Footer with details
 
-## Features in consideration
+## Updates in consideration
 
 ### Urgent
 
@@ -30,3 +30,5 @@ Made for joy with Claude.
 - Hard mode: AI uses probability density strategy (calculate which cells are most likely to contain a ship given what's known, attack the highest-probability cell)
 - Change colour schemes? Light mode and dark mode?
 - Statistics tracker for multiple games
+- Update final score to declare how many total shots to win (currently says 17 shots on win - the number of shots required to win)
+- Update player fleet deployment panel to declare AFLOAT or SUNK like Enemy panel
